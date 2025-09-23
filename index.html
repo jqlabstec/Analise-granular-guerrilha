@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Análise Granular Guerrilha Pré e Flex</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #e7e7e7;
+    }
+
+    .card {
+      background: white;
+      border-radius: 1rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .2);
+      padding: 1.5rem;
+    }
+
+    th,
+    td {
+      text-align: center;
+      padding: 0.75rem 0.5rem;
+    }
+
+    .table-responsive {
+      overflow-x: auto;
+    }
+
+    img {
+      border-radius: 5px;
+    }
+  </style>
+</head>
+
+<body class="p-6">
+
+  <div class="max-w-[1600px] mx-auto">
+    <!-- Header -->
+    <header class="bg-blue-600 p-4 rounded-xl shadow-md mb-6" style="background: linear-gradient(to right, #732497, #6500e9);">
+      <div class="flex items-center justify-between flex-wrap gap-4">
+        <div class="flex items-center space-x-2 sm:space-x-4">
+          <img src="/almavivaexperience_cover.jpeg" alt="Logo da empresa" class="h-8 sm:h-10">
+          <h1 class="text-xl sm:text-2xl font-bold text-white">Análise Granular Guerrilha Pré e Flex</h1>
+        </div>
+        <span class="text-sm text-white mt-2 sm:mt-0">Atualizado em: <span id="last-updated"></span></span>
+      </div>
+    </header>
+
+    <!-- Filtros -->
+    <section class="card mb-6">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800">Filtros</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="flex flex-col">
+          <label for="date-filter" class="font-medium text-gray-700 block mb-1">Data</label>
+          <input type="date" id="date-filter" class="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div class="flex flex-col">
+          <label for="foco-filter" class="font-medium text-gray-700 block mb-1">Foco</label>
+          <select id="foco-filter" class="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="Todos">Todos</option>
+          </select>
+        </div>
+        <div class="flex flex-col">
+          <label for="supervisor-filter" class="font-medium text-gray-700 block mb-1">Supervisor</label>
+          <select id="supervisor-filter" class="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"></select>
+        </div>
+        <div class="flex flex-col">
+          <label for="regional-filter" class="font-medium text-gray-700 block mb-1">Regional</label>
+          <select id="regional-filter" class="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"></select>
+        </div>
+        <div class="flex flex-col">
+          <label for="consultant-filter" class="font-medium text-gray-700 block mb-1">Consultor</label>
+          <input type="text" id="consultant-filter" placeholder="Nome do Consultor" class="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div class="flex flex-col mt-4">
+          <label for="status-filter" class="font-medium text-gray-700 block mb-1">Status</label>
+          <select id="status-filter" class="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="Todos">Todos</option>
+            <option value="ATIVO">ATIVO</option>
+            <option value="DESLIG">DESLIG</option>
+            <option value="AFAST">AFAST</option>
+            <option value="FÉRIAS">FÉRIAS</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cards Gerais de Resumo -->
+    <section id="general-summary-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-6">
+      <!-- Os cards gerais serão renderizados aqui -->
+    </section>
+
+    <!-- Cards dos Supervisores -->
+    <main id="cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-6 justify-items-center">
+    </main>
+  </div>
+
+  <script>
+    const cardsContainer = document.getElementById("cards-container");
+    const generalSummaryCardsContainer = document.getElementById("general-summary-cards");
+    const supervisorFilter = document.getElementById("supervisor-filter");
+    const regionalFilter = document.getElementById("regional-filter");
+    const dateFilter = document.getElementById("date-filter");
+    const consultantFilter = document.getElementById("consultant-filter");
+    const statusFilter = document.getElementById("status-filter");
+    const focoFilter = document.getElementById("foco-filter");
+    const lastUpdated = document.getElementById("last-updated");
+
+    let allConsultantData = [];
+    let processedData = [];
+    let uniqueDates = [];
+    let uniqueSupervisors = [];
+    let uniqueRegionals = [];
+    let uniqueFocos = [];
+
+    function parseDate(dateStr) {
+      if (!dateStr) return null;
+      
+      // Se já está no formato YYYY-MM-DD
+      if (typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return dateStr;
+      }
+      
+      // Se está no formato DD/MM/YYYY
+      if (typeof dateStr === 'string' && dateStr.includes('/')) {
+        const [day, month, year] = dateStr.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      
+      // Se é um número serial do Excel
+      if (typeof dateStr === 'number') {
+        const date = new Date((dateStr - 25569) * 86400 * 1000);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      
+      return null;
+    }
+
+    // Função para agrupar dados por supervisor e acumular valores por consultor
+    function groupDataBySupervisor(data) {
+      const grouped = {};
+      
+      data.forEach(item => {
+        const supervisorName = item.SUPERVISOR;
+        const consultantName = item.CONSULTOR;
+
+        if (!grouped[supervisorName]) {
+          grouped[supervisorName] = {
+            supervisor: supervisorName,
+            regional: item.REGIONAL,
+            consultores: {}
+          };
+        }
+
+        const supData = grouped[supervisorName];
+        if (!supData.consultores[consultantName]) {
+          supData.consultores[consultantName] = {
+            CONSULTOR: consultantName,
+            STATUS: item.STATUS || "N/A",
+            META_COMBO: 0,
+            COMB_ATV: 0,
+            META_FLEX: 0,
+            FLEX_ATV: 0,
+            FLEX_CARTAO: 0,
+            DIAS_UTEIS: 0
+          };
+        }
+
+        const consData = supData.consultores[consultantName];
+        consData.META_COMBO += Number(item["META COMBO"] || 0);
+        consData.COMB_ATV += Number(item["COMB ATV"] || 0);
+        consData.META_FLEX += Number(item["META FLEX"] || 0);
+        consData.FLEX_ATV += Number(item["FLEX ATV"] || 0);
+        consData.FLEX_CARTAO += Number(item["FLEX CARTÃO"] || 0);
+        consData.DIAS_UTEIS += Number(item["DIAS ÚTEIS"] || 0);
+      });
+
+      const supervisorsArray = Object.values(grouped).map(sup => {
+        sup.consultores = Object.values(sup.consultores)
+          .sort((a, b) => {
+            // Primeiro, ordena por STATUS: ATIVO vem antes de outros
+            if (a.STATUS !== b.STATUS) {
+              return a.STATUS === "ATIVO" ? -1 : 1;
+            }
+            // Se o STATUS for igual, ordena por total de ativações (COMBO + FLEX) decrescente
+            const totalA = a.COMB_ATV + a.FLEX_ATV;
+            const totalB = b.COMB_ATV + b.FLEX_ATV;
+            return totalB - totalA;
+          });
+        return sup;
+      });
+
+      return supervisorsArray;
+    }
+
+    // Renderizar os cards de resumo geral
+    function renderGeneralSummaryCards(data) {
+      generalSummaryCardsContainer.innerHTML = "";
+
+      if (data.length === 0) {
+        generalSummaryCardsContainer.innerHTML = "<p class='text-center text-gray-500 text-lg col-span-full'>Nenhum dado geral encontrado.</p>";
+        return;
+      }
+
+      const totalMetaCombo = data.reduce((sum, item) => sum + Number(item["META COMBO"] || 0), 0);
+      const totalCombAtv = data.reduce((sum, item) => sum + Number(item["COMB ATV"] || 0), 0);
+      const totalMetaFlex = data.reduce((sum, item) => sum + Number(item["META FLEX"] || 0), 0);
+      const totalFlexAtv = data.reduce((sum, item) => sum + Number(item["FLEX ATV"] || 0), 0);
+      const totalFlexCartao = data.reduce((sum, item) => sum + Number(item["FLEX CARTÃO"] || 0), 0);
+
+      const pctFlexCartao = totalFlexAtv > 0 ? ((totalFlexCartao / totalFlexAtv) * 100).toFixed(1) : "0.0";
+
+      // Dados para os cards gerais
+      const summaryMetrics = [
+        {
+          title: "Meta Combo Total",
+          value: totalMetaCombo.toLocaleString("pt-BR", { maximumFractionDigits: 0 }),
+          color: "text-green-700"
+        },
+        {
+          title: "Combo Ativado Total",
+          value: totalCombAtv.toLocaleString("pt-BR"),
+          color: "text-blue-700"
+        },
+        {
+          title: "Meta Flex Total",
+          value: totalMetaFlex.toLocaleString("pt-BR", { maximumFractionDigits: 0 }),
+          color: "text-purple-700"
+        },
+        {
+          title: "Flex Ativado Total",
+          value: totalFlexAtv.toLocaleString("pt-BR"),
+          color: "text-indigo-700"
+        },
+        {
+          title: "% Flex Cartão",
+          value: `${pctFlexCartao}%`,
+          color: "text-orange-700"
+        }
+      ];
+
+      summaryMetrics.forEach(metric => {
+        const card = document.createElement("div");
+        card.className = "card p-4 flex flex-col justify-center items-center text-center";
+        card.innerHTML = `
+          <p class="text-sm font-medium text-gray-600 mb-1">${metric.title}</p>
+          <p class="text-2xl font-bold ${metric.color}">${metric.value}</p>
+        `;
+        generalSummaryCardsContainer.appendChild(card);
+      });
+    }
+
+    // Função para criar o card de um supervisor
+    function createSupervisorCard(supervisor) {
+      const totalMetaCombo = supervisor.consultores.reduce((s, c) => s + c.META_COMBO, 0);
+      const totalCombAtv = supervisor.consultores.reduce((s, c) => s + c.COMB_ATV, 0);
+      const totalMetaFlex = supervisor.consultores.reduce((s, c) => s + c.META_FLEX, 0);
+      const totalFlexAtv = supervisor.consultores.reduce((s, c) => s + c.FLEX_ATV, 0);
+      const totalFlexCartao = supervisor.consultores.reduce((s, c) => s + c.FLEX_CARTAO, 0);
+
+      const pctFlexCartao = totalFlexAtv > 0 ? ((totalFlexCartao / totalFlexAtv) * 100).toFixed(1) : "0.00";
+      
+      // Calculando % de atingimento
+      const pctCombo = totalMetaCombo > 0 ? ((totalCombAtv / totalMetaCombo) * 100).toFixed(1) : "0.0";
+      const pctFlex = totalMetaFlex > 0 ? ((totalFlexAtv / totalMetaFlex) * 100).toFixed(1) : "0.0";
+
+      const card = document.createElement("div");
+      card.className = "card w-full max-w-[900px]";
+
+      card.innerHTML = `
+        <div class="flex items-center gap-4 mb-4">
+          <div class="w-16 h-16 min-w-[4rem] rounded-full flex items-center justify-center text-white text-2xl font-bold" style="background: #5a4ac7;">
+            ${supervisor.supervisor ? supervisor.supervisor.charAt(0).toUpperCase() : 'S'}
+          </div>
+          <div class="flex-grow">
+            <h3 class="text-xl font-semibold text-gray-800">${supervisor.supervisor}</h3>
+            <p class="text-gray-500 text-sm">${supervisor.regional}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-5 text-center text-sm font-medium text-gray-600 border-b pb-2 mb-3 gap-x-2 gap-y-2">
+          <div>META COMBO</div>
+          <div>COMBO ATV</div>
+          <div>META FLEX</div>
+          <div>FLEX ATV</div>
+          <div>% FLEX CARTÃO</div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-5 text-center text-base mb-4 gap-x-2 gap-y-2">
+          <div class="font-bold text-green-700">${totalMetaCombo.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</div>
+          <div class="font-bold text-blue-700">${totalCombAtv.toLocaleString("pt-BR")} <span class="text-sm text-gray-500">(${pctCombo}%)</span></div>
+          <div class="font-bold text-purple-700">${totalMetaFlex.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</div>
+          <div class="font-bold text-indigo-700">${totalFlexAtv.toLocaleString("pt-BR")} <span class="text-sm text-gray-500">(${pctFlex}%)</span></div>
+          <div class="font-bold text-orange-700">${pctFlexCartao}%</div>
+        </div>
+
+        <div class="table-responsive flex-grow">
+          <table class="w-full text-sm border border-gray-200 rounded-lg">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="py-2">Consultor</th>
+                <th class="py-2">Status</th>
+                <th class="py-2">Meta Combo</th>
+                <th class="py-2">Combo Atv</th>
+                <th class="py-2">Meta Flex</th>
+                <th class="py-2">Flex Atv</th>
+                <th class="py-2">Meta D.U. Combo</th>
+                <th class="py-2">Meta D.U. Flex</th>
+                <th class="py-2">% Flex Cartão</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${supervisor.consultores.map(c => {
+                const metaDUCombo = c.DIAS_UTEIS > 0 ? Math.round(c.META_COMBO / c.DIAS_UTEIS) : 0;
+                const metaDUFlex = c.DIAS_UTEIS > 0 ? Math.round(c.META_FLEX / c.DIAS_UTEIS) : 0;
+                const pctFlexCartaoConsultor = c.FLEX_ATV > 0 ? ((c.FLEX_CARTAO / c.FLEX_ATV) * 100).toFixed(1) : "0.0";
+                const statusClass = c.STATUS === "ATIVO" ? "bg-green-500" : "bg-red-500";
+                
+                return `
+                  <tr class="border-t border-gray-100 hover:bg-gray-50">
+                    <td class="font-medium text-left px-2 py-2">${c.CONSULTOR}</td>
+                    <td class="py-2">
+                      <div class="flex items-center justify-center">
+                        <div class="h-2 w-2 rounded-full ${statusClass} mr-2"></div>
+                        ${c.STATUS}
+                      </div>
+                    </td>
+                    <td>${c.META_COMBO.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td>
+                    <td>${c.COMB_ATV.toLocaleString("pt-BR")}</td>
+                    <td>${c.META_FLEX.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td>
+                    <td>${c.FLEX_ATV.toLocaleString("pt-BR")}</td>
+                    <td>${metaDUCombo}</td>
+                    <td>${metaDUFlex}</td>
+                    <td>${pctFlexCartaoConsultor}%</td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+      return card;
+    }
+
+    // Função para popular os filtros
+    function populateFilters() {
+      uniqueDates = [...new Set(processedData
+          .map(d => d.DATA_FORMATTED)
+          .filter(Boolean))]
+        .sort((a, b) => new Date(b) - new Date(a));
+
+      uniqueFocos = [...new Set(processedData.map(d => d.FOCO).filter(Boolean))].sort();
+      focoFilter.innerHTML = `<option value="Todos">Todos</option>` + uniqueFocos.map(f => `<option value="${f}">${f}</option>`).join("");
+      
+      updateDependentFilters();
+
+      // Definir data inicial como a mais recente
+      if (uniqueDates.length > 0) {
+        dateFilter.value = uniqueDates[0];
+      } else {
+        dateFilter.value = "";
+      }
+    }
+
+    function updateDependentFilters() {
+      const focoVal = focoFilter.value;
+      let filteredData = [...processedData];
+      
+      if (focoVal !== "Todos") {
+        filteredData = filteredData.filter(d => d.FOCO === focoVal);
+      }
+
+      uniqueSupervisors = [...new Set(filteredData.map(d => d.SUPERVISOR))].sort();
+      supervisorFilter.innerHTML = `<option value="Todos">Todos</option>` + uniqueSupervisors.map(s => `<option value="${s}">${s}</option>`).join("");
+
+      uniqueRegionals = [...new Set(filteredData.map(d => d.REGIONAL))].sort();
+      regionalFilter.innerHTML = `<option value="Todos">Todos</option>` + uniqueRegionals.map(r => `<option value="${r}">${r}</option>`).join("");
+    }
+
+    function applyFilters() {
+      let filteredData = [...processedData];
+
+      // Filtro de data
+      if (dateFilter.value) {
+        const selectedDate = dateFilter.value;
+        filteredData = filteredData.filter(d => d.DATA_FORMATTED && d.DATA_FORMATTED <= selectedDate);
+      }
+
+      if (focoFilter.value !== "Todos") {
+        filteredData = filteredData.filter(d => d.FOCO === focoFilter.value);
+      }
+
+      if (supervisorFilter.value !== "Todos") {
+        filteredData = filteredData.filter(d => d.SUPERVISOR === supervisorFilter.value);
+      }
+
+      if (regionalFilter.value !== "Todos") {
+        filteredData = filteredData.filter(d => d.REGIONAL === regionalFilter.value);
+      }
+
+      const searchTerm = consultantFilter.value.trim().toLowerCase();
+      if (searchTerm) {
+        filteredData = filteredData.filter(d => d.CONSULTOR.toLowerCase().includes(searchTerm));
+      }
+
+      if (statusFilter.value !== "Todos") {
+        filteredData = filteredData.filter(d => d.STATUS === statusFilter.value);
+      }
+
+      // Renderizar os cards de resumo geral com os dados filtrados
+      renderGeneralSummaryCards(filteredData);
+
+      const groupedBySupervisor = groupDataBySupervisor(filteredData);
+      renderCards(groupedBySupervisor);
+    }
+
+    function renderCards(data) {
+      cardsContainer.innerHTML = "";
+      if (data.length === 0) {
+        cardsContainer.innerHTML = "<p class='text-center text-gray-500 text-lg col-span-full'>Nenhum dado encontrado com os filtros aplicados.</p>";
+      } else {
+        data.forEach(sup => cardsContainer.appendChild(createSupervisorCard(sup)));
+      }
+    }
+
+    async function init() {
+      try {
+        const response = await fetch("data.json");
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        allConsultantData = await response.json();
+
+        processedData = allConsultantData.map(item => {
+          const formatted = parseDate(item.DATA);
+
+          return {
+            ...item,
+            STATUS: (item.STATUS || "").trim().toUpperCase(),
+            DATA_FORMATTED: formatted,
+            FOCO: item.FOCO || "N/A"
+          };
+        });
+
+        populateFilters();
+        applyFilters();
+        lastUpdated.textContent = new Date().toLocaleDateString("pt-BR");
+      } catch (err) {
+        console.error("Erro ao carregar ou processar os dados:", err);
+        cardsContainer.innerHTML = "<p class='text-center text-red-500 text-lg col-span-full'>Ocorreu um erro ao carregar os dados. Tente novamente mais tarde.</p>";
+      }
+    }
+
+    dateFilter.addEventListener("change", applyFilters);
+    focoFilter.addEventListener("change", () => { updateDependentFilters(); applyFilters(); });
+    supervisorFilter.addEventListener("change", applyFilters);
+    regionalFilter.addEventListener("change", applyFilters);
+    consultantFilter.addEventListener("input", applyFilters);
+    statusFilter.addEventListener('change', applyFilters);
+
+    document.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+
+</html>
