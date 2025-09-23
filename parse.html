@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Conversor de Planilha para JSON</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- SheetJS (xlsx) para ler planilhas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col items-center justify-center p-6">
+
+  <div class="bg-white p-8 rounded-lg shadow-xl max-w-xl w-full">
+    <h1 class="text-3xl font-bold mb-4 text-center text-blue-800">Conversor de Planilha para JSON</h1>
+    <p class="text-center text-gray-600 mb-6">Carregue sua planilha para converter e visualizar os dados no formato JSON.</p>
+
+    <label class="block mb-2 font-medium">Selecione sua planilha (.xlsx ou .xls):</label>
+    <input id="fileInput" type="file" accept=".xlsx,.xls" class="mb-4 w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+
+    <button onclick="downloadJSON()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-3 rounded-lg w-full transition-colors duration-200 ease-in-out shadow-md">
+      Baixar JSON Gerado
+    </button>
+
+    <pre id="jsonPreview" class="bg-gray-50 mt-6 p-4 rounded-lg max-h-96 overflow-auto text-xs border border-gray-200 shadow-inner"></pre>
+    <div id="messageBox" class="hidden mt-4 p-3 rounded-md bg-yellow-100 text-yellow-800 border border-yellow-300"></div>
+  </div>
+
+  <script>
+    let jsonData = [];
+    const messageBox = document.getElementById('messageBox');
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const data = new Uint8Array(event.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: 0 });
+          
+          if (jsonData.length > 0) {
+            const preview = document.getElementById('jsonPreview');
+            preview.textContent = JSON.stringify(jsonData, null, 2);
+            showMessage("Dados da planilha carregados e prontos para download.", "success");
+          } else {
+            showMessage("A planilha não contém dados válidos.", "warning");
+          }
+        } catch (error) {
+          console.error(error);
+          showMessage("Ocorreu um erro ao processar o arquivo. Verifique se é uma planilha válida.", "error");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    function downloadJSON() {
+      if (!jsonData.length) {
+        showMessage("Por favor, carregue uma planilha primeiro.", "warning");
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'data.json';
+      link.click();
+
+      URL.revokeObjectURL(url);
+    }
+    
+    function showMessage(message, type) {
+      messageBox.textContent = message;
+      messageBox.className = "mt-4 p-3 rounded-md border text-center";
+      
+      switch(type) {
+        case "success":
+          messageBox.classList.add("bg-green-100", "text-green-800", "border-green-300");
+          break;
+        case "warning":
+          messageBox.classList.add("bg-yellow-100", "text-yellow-800", "border-yellow-300");
+          break;
+        case "error":
+          messageBox.classList.add("bg-red-100", "text-red-800", "border-red-300");
+          break;
+      }
+      messageBox.classList.remove("hidden");
+    }
+  </script>
+</body>
+</html>
