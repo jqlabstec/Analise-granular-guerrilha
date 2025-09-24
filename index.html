@@ -64,12 +64,12 @@
           </select>
         </div>
         <div class="flex flex-col">
-          <label for="supervisor-filter" class="font-medium text-gray-700 block mb-1">Supervisor</label>
-          <select id="supervisor-filter" class="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"></select>
-        </div>
-        <div class="flex flex-col">
           <label for="regional-filter" class="font-medium text-gray-700 block mb-1">Regional</label>
           <select id="regional-filter" class="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"></select>
+        </div>
+        <div class="flex flex-col">
+          <label for="supervisor-filter" class="font-medium text-gray-700 block mb-1">Supervisor</label>
+          <select id="supervisor-filter" class="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"></select>
         </div>
         <div class="flex flex-col">
           <label for="consultant-filter" class="font-medium text-gray-700 block mb-1">Consultor</label>
@@ -118,18 +118,18 @@
 
     function parseDate(dateStr) {
       if (!dateStr) return null;
-      
+
       // Se já está no formato YYYY-MM-DD
       if (typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
         return dateStr;
       }
-      
+
       // Se está no formato DD/MM/YYYY
       if (typeof dateStr === 'string' && dateStr.includes('/')) {
         const [day, month, year] = dateStr.split('/');
         return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       }
-      
+
       // Se é um número serial do Excel
       if (typeof dateStr === 'number') {
         const date = new Date((dateStr - 25569) * 86400 * 1000);
@@ -138,14 +138,14 @@
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       }
-      
+
       return null;
     }
 
     // Função para agrupar dados por supervisor e acumular valores por consultor
     function groupDataBySupervisor(data) {
       const grouped = {};
-      
+
       data.forEach(item => {
         const supervisorName = item.SUPERVISOR;
         const consultantName = item.CONSULTOR;
@@ -217,10 +217,11 @@
       const pctFlexCartao = totalFlexAtv > 0 ? ((totalFlexCartao / totalFlexAtv) * 100).toFixed(1) : "0.0";
 
       // Dados para os cards gerais
-      const summaryMetrics = [
-        {
+      const summaryMetrics = [{
           title: "Meta Combo Total",
-          value: totalMetaCombo.toLocaleString("pt-BR", { maximumFractionDigits: 0 }),
+          value: totalMetaCombo.toLocaleString("pt-BR", {
+            maximumFractionDigits: 0
+          }),
           color: "text-green-700"
         },
         {
@@ -230,7 +231,9 @@
         },
         {
           title: "Meta Flex Total",
-          value: totalMetaFlex.toLocaleString("pt-BR", { maximumFractionDigits: 0 }),
+          value: totalMetaFlex.toLocaleString("pt-BR", {
+            maximumFractionDigits: 0
+          }),
           color: "text-purple-700"
         },
         {
@@ -264,8 +267,8 @@
       const totalFlexAtv = supervisor.consultores.reduce((s, c) => s + c.FLEX_ATV, 0);
       const totalFlexCartao = supervisor.consultores.reduce((s, c) => s + c.FLEX_CARTAO, 0);
 
-      const pctFlexCartao = totalFlexAtv > 0 ? ((totalFlexCartao / totalFlexAtv) * 100).toFixed(1) : "0.00";
-      
+      const pctFlexCartao = totalFlexAtv > 0 ? ((totalFlexCartao / totalFlexAtv) * 100).toFixed(1) : "0.0";
+
       // Calculando % de atingimento
       const pctCombo = totalMetaCombo > 0 ? ((totalCombAtv / totalMetaCombo) * 100).toFixed(1) : "0.0";
       const pctFlex = totalMetaFlex > 0 ? ((totalFlexAtv / totalMetaFlex) * 100).toFixed(1) : "0.0";
@@ -357,7 +360,7 @@
 
       uniqueFocos = [...new Set(processedData.map(d => d.FOCO).filter(Boolean))].sort();
       focoFilter.innerHTML = `<option value="Todos">Todos</option>` + uniqueFocos.map(f => `<option value="${f}">${f}</option>`).join("");
-      
+
       updateDependentFilters();
 
       // Definir data inicial como a mais recente
@@ -369,18 +372,41 @@
     }
 
     function updateDependentFilters() {
-      const focoVal = focoFilter.value;
-      let filteredData = [...processedData];
-      
-      if (focoVal !== "Todos") {
-        filteredData = filteredData.filter(d => d.FOCO === focoVal);
+      // Primeiro, filtra por FOCO
+      let filteredByFoco = [...processedData];
+      if (focoFilter.value !== "Todos") {
+        filteredByFoco = filteredByFoco.filter(d => d.FOCO === focoFilter.value);
       }
 
-      uniqueSupervisors = [...new Set(filteredData.map(d => d.SUPERVISOR))].sort();
-      supervisorFilter.innerHTML = `<option value="Todos">Todos</option>` + uniqueSupervisors.map(s => `<option value="${s}">${s}</option>`).join("");
-
-      uniqueRegionals = [...new Set(filteredData.map(d => d.REGIONAL))].sort();
+      // Atualiza as opções de REGIONAL baseado no FOCO
+      uniqueRegionals = [...new Set(filteredByFoco.map(d => d.REGIONAL))].sort();
+      const currentRegional = regionalFilter.value;
       regionalFilter.innerHTML = `<option value="Todos">Todos</option>` + uniqueRegionals.map(r => `<option value="${r}">${r}</option>`).join("");
+      
+      // Mantém a seleção de regional se ainda estiver disponível
+      if (uniqueRegionals.includes(currentRegional) || currentRegional === "Todos") {
+        regionalFilter.value = currentRegional;
+      } else {
+        regionalFilter.value = "Todos";
+      }
+
+      // Agora filtra por REGIONAL
+      let filteredByRegional = [...filteredByFoco];
+      if (regionalFilter.value !== "Todos") {
+        filteredByRegional = filteredByRegional.filter(d => d.REGIONAL === regionalFilter.value);
+      }
+
+      // Atualiza as opções de SUPERVISOR baseado no FOCO + REGIONAL
+      uniqueSupervisors = [...new Set(filteredByRegional.map(d => d.SUPERVISOR))].sort();
+      const currentSupervisor = supervisorFilter.value;
+      supervisorFilter.innerHTML = `<option value="Todos">Todos</option>` + uniqueSupervisors.map(s => `<option value="${s}">${s}</option>`).join("");
+      
+      // Mantém a seleção de supervisor se ainda estiver disponível
+      if (uniqueSupervisors.includes(currentSupervisor) || currentSupervisor === "Todos") {
+        supervisorFilter.value = currentSupervisor;
+      } else {
+        supervisorFilter.value = "Todos";
+      }
     }
 
     function applyFilters() {
@@ -396,12 +422,12 @@
         filteredData = filteredData.filter(d => d.FOCO === focoFilter.value);
       }
 
-      if (supervisorFilter.value !== "Todos") {
-        filteredData = filteredData.filter(d => d.SUPERVISOR === supervisorFilter.value);
-      }
-
       if (regionalFilter.value !== "Todos") {
         filteredData = filteredData.filter(d => d.REGIONAL === regionalFilter.value);
+      }
+
+      if (supervisorFilter.value !== "Todos") {
+        filteredData = filteredData.filter(d => d.SUPERVISOR === supervisorFilter.value);
       }
 
       const searchTerm = consultantFilter.value.trim().toLowerCase();
@@ -456,9 +482,18 @@
     }
 
     dateFilter.addEventListener("change", applyFilters);
-    focoFilter.addEventListener("change", () => { updateDependentFilters(); applyFilters(); });
+    
+    focoFilter.addEventListener("change", () => {
+      updateDependentFilters();
+      applyFilters();
+    });
+
+    regionalFilter.addEventListener("change", () => {
+      updateDependentFilters();
+      applyFilters();
+    });
+
     supervisorFilter.addEventListener("change", applyFilters);
-    regionalFilter.addEventListener("change", applyFilters);
     consultantFilter.addEventListener("input", applyFilters);
     statusFilter.addEventListener('change', applyFilters);
 
